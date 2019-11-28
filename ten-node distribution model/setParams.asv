@@ -1,0 +1,231 @@
+% Written by Josh Clancy
+% Last Updated 27th November 2019
+% This script is used to automatically set variables in the simscape matlab
+% model developed by the same author "tennode"
+
+%Create loop of setting each portfolio parameter
+%Use Scenario table to enable DERs at each site and set power capacities
+T = readtable("C:\INSERT FILEPATH FOR SCENARIO DATA\EXAMPLE.xlsx");
+load_vars;
+Freq_Log = zeros(1+t_simrun/Ts,300);
+Loss = zeros(1000,50); %17 line losses, 10 transformer losses, % 20 Power conversion losses; Total Line Loss, Total Transformer Loss, Total Conversion Losses
+S2 = zeros(8,30);
+for counter = 1:17
+    str = sprintf('Loss in Line %d', counter);
+    Loss(1,counter) = str;
+end
+for counter = 1:10
+    str = sprintf('Loss in LV Transformer %d', counter);
+    Loss(1,17+counter) = str
+end
+for counter = 1:10
+    str = sprintf('Conversion Loss in BESS %d', counter);
+    Loss(1,27+counter) = str
+    str = sprintf('Conversion Loss in PV %d', counter);
+    Loss(1,37+counter) = str
+end
+Loss(1,48) = sprintf('TOTAL Line Loss');
+Loss(1,49) = sprintf('TOTAL Transformer Loss');
+Loss(1,50) = sprintf('TOTAL Conversion Loss');
+Loss = zeros(1000,10);
+PowerSave = zeros(300,10);
+j = 1;
+k = 1;
+
+for i = 1:le
+    %% DER Enabling
+    % BESS
+    total_B_W = 0;
+    for counter = 1:10
+        str = sprintf('DER%d_BESS_en', counter);
+        if table2array(T(i,1+counter)) > 0
+            assignin('base',str, 1);
+            str = sprintf('P_set%d', counter);
+            assignin('base',str, table2array(T(i,11+counter)));
+        else
+             assignin('base',str, 0);
+            str = sprintf('P_set%d', counter);
+            assignin('base',str, 0);
+        end
+        total_B_W = total_B_W + eval([str]);
+    end
+    P_set1 = 
+    
+    % Demand Response
+    total_DR_Capacity = 0;
+    for counter = 1:10
+        str = sprintf('DR_en_%d', counter);
+        if table2array(T(i,21+counter)) > 0
+            assignin('base',str, 1);
+            str = sprintf('DR_capacity_%d', counter);
+            assignin('base',str, table2array(T(i,21+counter)));
+        else
+            assignin('base',str, 0);
+            str = sprintf('DR_capacity_%d', counter);
+            assignin('base',str, 0);
+        end
+        total_DR_Capacity = total_DR_Capacity + eval([str]);
+    end
+    
+    % PV Arrays
+    total_PV_Power = 0;
+    for counter = 1:10
+        str = sprintf('PV_en_%d', counter);
+        if table2array(T(i,21+counter)) > 0
+            assignin('base',str, 1);
+            str = sprintf('PV_capacity_%d', counter);
+            assignin('base',str, table2array(T(i,21+counter)));
+        else
+            assignin('base',str, 0);
+            str = sprintf('PV_capacity_%d', counter);
+            assignin('base',str, 0);
+        end
+        total_PV_Power = total_PV_Power + eval([str]);
+    end
+    
+    % Run Scenario Simulation
+    str = sprintf('Running iteration: %d...', i);
+    disp(str)
+    sim('tennode_3',t_simrun)
+    str = sprintf('...\nSimulation Complete', i);
+    disp(str)
+    
+    Freq_Log(1,j) = i;
+    Freq_Log(:,j+1) = Sys_frequency.time;
+    Freq_Log(:,j+2) = Sys_frequency.signals.values;
+
+    S = stepinfo(Sys_frequency.time((t_contingency/Ts):(1+t_simrun/Ts)),Sys_frequency.signals.values((t_contingency/Ts):(1+t_simrun/Ts)));
+    S_arr = [S.RiseTime; S.SettlingTime; S.SettlingMin; S.SettlingMax; S.Overshoot; S.Undershoot; S.Peak; S.PeakTime];
+    S2(:,i) = S_arr;
+    
+    j = j + 3;
+    
+    str = sprintf('...', i);
+    disp(str)
+    
+    %% Voltage
+    for counter = 1:17
+        str = sprintf('line%d', counter);
+%         I_line = max(Ip_data.signals(counter).values(t_contingency/(4*Ts):t_contingency/(2*Ts),1));
+        z_line = eval([str]);
+%         Loss(i+1,counter) = z_line*I_line^2;
+    end
+    
+    V_subA2 = max(V_data.signals(11).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_1 = max(Vp_data.signals(1).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_2 = max(Vp_data.signals(2).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_3 = max(Vp_data.signals(3).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_4 = max(Vp_data.signals(4).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_5 = max(Vp_data.signals(5).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_6 = max(Vp_data.signals(6).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_7 = max(Vp_data.signals(7).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_8 = max(Vp_data.signals(8).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_9 = max(Vp_data.signals(9).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    V_prime_10 = max(Vp_data.signals(10).values(((t_simrun-t_contingency)*0.5+t_contingency):t_simrun,1));
+    
+    t_spot = zeros(1,10);
+    for counter2 = 1:10
+        str = sprintf('V_prime_%d', counter2);
+        
+        for counter = ((t_simrun-t_contingency)*0.5+t_contingency):t_simrun
+            str2 = sprintf('Vp_data.signals(%d).values(%d,1)', counter2, counter);
+            if  eval([str]) == eval([str2])
+                t_spot(1,counter2) = Vp_data.time(counter)/Ts;
+            end
+        end
+    end  
+    
+    V_sec_1 = V_data.signals(1).values(t_spot(1,1),1);
+    V_sec_2 = V_data.signals(2).values(t_spot(1,2),1);
+    V_sec_3 = V_data.signals(3).values(t_spot(1,3),1);
+    V_sec_4 = V_data.signals(4).values(t_spot(1,4),1);
+    V_sec_5 = V_data.signals(5).values(t_spot(1,5),1);
+    V_sec_6 = V_data.signals(6).values(t_spot(1,6),1);
+    V_sec_7 = V_data.signals(7).values(t_spot(1,7),1);
+    V_sec_8 = V_data.signals(8).values(t_spot(1,8),1);
+    V_sec_9 = V_data.signals(9).values(t_spot(1,9),1);
+    V_sec_10 = V_data.signals(10).values(t_spot(1,10),1);
+    
+    V_line_drop_1 = V_subA2 - V_prime_1;
+    V_line_drop_2 = V_subA2 - V_prime_2;
+    V_line_drop_3 = V_subA2 - V_prime_3;
+    V_line_drop_4 = V_subA2 - V_prime_4;
+    V_line_drop_5 = V_subA2 - V_prime_5;
+    V_line_drop_6 = V_prime_2 - V_prime_5;
+    V_line_drop_7 = V_prime_4 - V_prime_5;
+    V_line_drop_8 = V_prime_4 - V_prime_6;
+    V_line_drop_9 = V_prime_6 - V_prime_7;
+    V_line_drop_10 = V_prime_4 - V_prime_7;
+    V_line_drop_11 = V_prime_3 - V_prime_8;
+    V_line_drop_12 = V_prime_7 - V_prime_8;
+    V_line_drop_13 = V_prime_8 - V_prime_9;
+    V_line_drop_14 = V_prime_9 - V_prime_10;
+    V_line_drop_15 = V_prime_10 - V_prime_1;
+    V_line_drop_16 = V_prime_1 - V_prime_2;
+    V_line_drop_17 = V_prime_3 - V_prime_4;
+    
+    V_trans_drop_1 = V_prime_1 - (22e3/400)*V_sec_1;
+    V_trans_drop_2 = V_prime_2 - (22e3/400)*V_sec_2;
+    V_trans_drop_3 = V_prime_3 - (22e3/400)*V_sec_3;
+    V_trans_drop_4 = V_prime_4 - (22e3/400)*V_sec_4;
+    V_trans_drop_5 = V_prime_5 - (22e3/400)*V_sec_5;
+    V_trans_drop_6 = V_prime_6 - (22e3/400)*V_sec_6;
+    V_trans_drop_7 = V_prime_7 - (22e3/400)*V_sec_7;
+    V_trans_drop_8 = V_prime_8 - (22e3/400)*V_sec_8;
+    V_trans_drop_9 = V_prime_9 - (22e3/400)*V_sec_9;
+    V_trans_drop_10 = V_prime_10 - (22e3/400)*V_sec_10;
+    
+    total_line_loss = 0;
+    total_trans_loss = 0;
+    for counter = 1:17
+        str = sprintf('line%d', counter);
+        z_line = eval([str]);
+        str = sprintf('V_line_drop_%d', counter);
+        copper_loss = abs(eval([str]))*z_line;
+        Loss(i+1,counter) = copper_loss;
+        total_line_loss = total_line_loss + copper_loss;
+        if counter < 11
+            str = sprintf('V_trans_drop_%d', counter);
+            trans_loss = abs(eval([str]))*0.02;
+            Loss(i+1,17 + counter) = trans_loss;
+            total_trans_loss = total_trans_loss + trans_loss;
+        end
+    end
+    Loss(1,48) = total_line_loss;
+    Loss(1,49) = total_trans_loss;
+    
+    total_demand = uDemand1 + uDemand2 + uDemand3 + uDemand4 + uDemand5 + uDemand6 + uDemand7 + uDemand8 + uDemand9 + uDemand10;
+    total_BESS_W = BESS_data.signals(1).values(:,1)+ BESS_data.signals(2).values(:,1)+BESS_data.signals(3).values(:,1)+BESS_data.signals(4).values(:,1)+BESS_data.signals(5).values(:,1)+BESS_data.signals(6).values(:,1)+BESS_data.signals(7).values(:,1)+BESS_data.signals(8).values(:,1)+BESS_data.signals(9).values(:,1)+BESS_data.signals(10).values(:,1);
+    total_BESS_VAr = BESS_data.signals(1).values(:,2)+ BESS_data.signals(2).values(:,2)+BESS_data.signals(3).values(:,2)+BESS_data.signals(4).values(:,2)+BESS_data.signals(5).values(:,2)+BESS_data.signals(6).values(:,2)+BESS_data.signals(7).values(:,2)+BESS_data.signals(8).values(:,2)+BESS_data.signals(9).values(:,2)+BESS_data.signals(10).values(:,2);
+%     total_PV_Power = PV_capacity_1*DER1_PV_en+PV_capacity_2*DER2_PV_en+PV_capacity_3*DER3_PV_en+PV_capacity_4*DER4_PV_en+PV_capacity_5*DER5_PV_en+PV_capacity_6*DER6_PV_en+PV_capacity_7*DER7_PV_en+PV_capacity_8*DER8_PV_en+PV_capacity_9*DER9_PV_en+PV_capacity_10*DER10_PV_en;
+    
+    
+    %% Power Record
+    
+    PowerSave(i,1:4) = [total_BESS_W(ceil(t_contingency/(2*Ts))) total_BESS_VAr(ceil(t_contingency/(2*Ts))) total_BESS_W(((t_simrun-t_contingency)*0.5+t_contingency)/Ts) total_BESS_VAr(((t_simrun-t_contingency)*0.5+t_contingency)/Ts)];
+    PowerSave(i,5:8) = [total_PV_Power total_DR_Capacity total_B_W total_demand];
+    
+    power_surplus = total_PV_Power+total_DR_Capacity+total_B_W-total_demand;
+    
+    PowerSave(i,9) = power_surplus;
+    
+    %% Save Data
+    
+    str = sprintf('...', i);
+    disp(str)
+    str = sprintf('Successful scenario %d', i);
+    disp(str)
+    
+     filename = 'FrequencyLog-151119.xlsx';
+     writetable(S2,filename,'Sheet',i,'Range','A1')
+    
+     filename = 'VoltLog-141119.xlsx';
+     writetable(VL,filename,'Sheet',i,'Range','A1')
+    
+     str = sprintf('Successful Write to Sheet %d', i);
+     disp(str)
+    
+end     
+
+str = sprintf('Successful iteration\nEXIT!');
+disp(str) 
